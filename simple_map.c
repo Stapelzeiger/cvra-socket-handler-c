@@ -27,14 +27,16 @@ int simple_map_add(simple_map_t *map, void *elem, void *key)
         map->arraylen = new_len;
     }
     int i = 0;
-    // while new element > entry_i
-    while (map->cmp_fn(key, ELEM_I(map, i)) == SIMPLE_MAP_COMP_GREATER_THAN) {
-        i++;
-        if (i == map->nb_entries) // i points to the first unused field
-            break;
+    if (map->nb_entries > 0) {
+        // while new element > entry_i
+        while (map->cmp_fn(key, ELEM_I(map, i)) == SIMPLE_MAP_COMP_GREATER_THAN) {
+            i++;
+            if (i == map->nb_entries) // i points to the first unused field
+                break;
+        }
+        if (map->cmp_fn(key, ELEM_I(map, i)) == SIMPLE_MAP_COMP_EQUAL)
+            return SIMPLE_MAP_KEY_EXISTS;
     }
-    if (map->cmp_fn(key, ELEM_I(map, i)) == SIMPLE_MAP_COMP_EQUAL)
-        return SIMPLE_MAP_KEY_EXISTS;
     // insert before entry_i
     memmove(ELEM_I(map, (i + 1)), ELEM_I(map, i),
         map->elem_sz * (map->nb_entries - i));
@@ -62,16 +64,16 @@ void *simple_map_find(simple_map_t *map, void *key)
 {
     // binary search in sorted array
     int a, b, i;
-    a = 0, b = map->nb_entries;
-    while (a != b) {
+    a = 0, b = map->nb_entries - 1;
+    while (b >= a) {
         i = (a + b)/2;
         int cmp = map->cmp_fn(key, ELEM_I(map, i));
         if (cmp == SIMPLE_MAP_COMP_EQUAL)
             return ELEM_I(map, i);
         if (cmp == SIMPLE_MAP_COMP_GREATER_THAN) {
-            a = i;
+            a = i + 1;
         } else {
-            b = i;
+            b = i - 1;
         }
     }
     return NULL;
