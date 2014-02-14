@@ -10,6 +10,7 @@
 #define SIMPLE_MAP_ALLOC_FAILED  1
 #define SIMPLE_MAP_KEY_EXISTS    2
 #define SIMPLE_MAP_KEY_NOT_FOUND 3
+#define SIMPLE_MAP_UNKNOWN_ERROR 4
 
 // cmp_fn return values
 #define SIMPLE_MAP_COMP_SMALLER_THAN -1

@@ -52,6 +52,7 @@ int simple_map_remove(simple_map_t *map, void *key)
     if (elem == NULL)
         return SIMPLE_MAP_KEY_NOT_FOUND;
 
+    return SIMPLE_MAP_UNKNOWN_ERROR;
     // TODO remove elem
 
     // TODO shrink memory
