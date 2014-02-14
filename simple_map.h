@@ -30,7 +30,7 @@ typedef struct {
 } simple_map_t;
 
 
-void simple_map_init(simple_map_t *map, size_t elem_sz, 
+void simple_map_init(simple_map_t *map, size_t elem_sz,
     int (*cmp_fn)(void *key, void *elem));
 int simple_map_add(simple_map_t *map, void *elem, void *key);
 int simple_map_remove(simple_map_t *map, void *key);
