@@ -47,6 +47,16 @@ int rcv_handler_register_type(rcv_handler_t *handler,
 int rcv_handler_forget_type(rcv_handler_t *handler, serialization_type_t *type);
 
 
+static rcv_connection_t *rcv_connection_for_socket(rcv_handler_t *h, int socket)
+{
+    return simple_map_find(&h->connections, (void*)&socket);
+}
+
+static type_callback_t *type_callback_for_hash(rcv_handler_t *h, uint8_t *hash)
+{
+    return simple_map_find(&h->types, (void*)&hash);
+}
+
 static int _map_connection_cmp_fn(void *key, void *conn)
 {
     if (*(int *)key == ((rcv_connection_t*)conn)->socket)
@@ -56,7 +66,7 @@ static int _map_connection_cmp_fn(void *key, void *conn)
     return SIMPLE_MAP_COMP_SMALLER_THAN;
 }
 
-static int _map_type_cmp_fn(void *key, void *type)
+static int _map_type_cb_cmp_fn(void *key, void *type)
 {
     int cmp = strncmp((char*)key, (char*)&((type_callback_t*)type)->type->hash, 8);
     if (cmp == 0)
@@ -70,7 +80,7 @@ static int _map_type_cmp_fn(void *key, void *type)
 void rcv_handler_init(rcv_handler_t *handler)
 {
     simple_map_init(&handler->connections, sizeof(rcv_connection_t), _map_connection_cmp_fn);
-    simple_map_init(&handler->types, sizeof(type_callback_t), _map_type_cmp_fn);
+    simple_map_init(&handler->types, sizeof(type_callback_t), _map_type_cb_cmp_fn);
     handler->unknown_type_callback = NULL;
 }
 
@@ -96,14 +106,14 @@ int rcv_handler_register_type(rcv_handler_t *handler,
     type_callback_t tc;
     tc.type = type;
     tc.callback = callback;
-    if (simple_map_add(&handler->types, &tc, &tc.type->hash) == SIMPLE_MAP_SUCCESS)
+    if (simple_map_add(&handler->types, &tc, (void*)&tc.type->hash) == SIMPLE_MAP_SUCCESS)
         return HANDLER_SUCCESS;
     return HANDLER_UNKNOWN_ERROR;
 }
 
 int rcv_handler_forget_type(rcv_handler_t *handler, serialization_type_t *type)
 {
-    if (simple_map_remove(&handler->connections, &type->hash) != SIMPLE_MAP_SUCCESS)
+    if (simple_map_remove(&handler->connections, (void*)&type->hash) != SIMPLE_MAP_SUCCESS)
         return HANDLER_UNKNOWN_ERROR;
     return HANDLER_SUCCESS;
 }
