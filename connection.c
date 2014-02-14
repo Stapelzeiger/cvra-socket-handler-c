@@ -59,51 +59,94 @@ void rcv_handler_init(rcv_handler_t *handler)
 }
 
 
-#define LIST_SUCCESS      0
-#define LIST_ALLOC_FAILED 1
+
+
+// Error codes (>0 is an error)
+#define SIMPLE_MAP_SUCCESS       0
+#define SIMPLE_MAP_ALLOC_FAILED  1
+#define SIMPLE_MAP_KEY_EXISTS    2
+#define SIMPLE_MAP_KEY_NOT_FOUND 3
 
 // cmp_fn return values
-#define LIST_COMP_SMALLER_THAN -1
-#define LIST_COMP_EQUAL         0
-#define LIST_COMP_GREATER_THAN  1
+#define SIMPLE_MAP_COMP_SMALLER_THAN -1
+#define SIMPLE_MAP_COMP_EQUAL         0
+#define SIMPLE_MAP_COMP_GREATER_THAN  1
+// The compare function is used for sorting / finding an element.
+// The compare function takes a pointer to the data structure and a pointer
+// to the key, which is a field inside the data structure and returns
+// SIMPLE_MAP_COMP_SMALLER_THAN, SIMPLE_MAP_COMP_EQUAL or
+// SIMPLE_MAP_COMP_GREATER_THAN.
 
 typedef struct {
-    void *array;
-    size_t elem_sz;
-    int arraylen;
-    int nb_entries;
-    int (*cmp_fn)(void *key, void *elem);
-} sorted_list_t;
+    void *array;    // sorted array of datastructs with size elem_sz
+    size_t elem_sz; // size of the structure stored in the map
+    int arraylen;   // length of the allocated array
+    int nb_entries; // number of elements stored
+    int (*cmp_fn)(void *key, void *elem); // compare fn pointer, see above
+} simple_map_t;
 
-int sorted_list_add(sorted_list_t *list, void *elem, void *key)
+
+void simple_map_init(simple_map_t *map, size_t elem_sz, 
+    int (*cmp_fn)(void *key, void *elem))
 {
-    if (list->nb_entries + 1 > list->arraylen) {
+    map->array = NULL;
+    map->elem_sz = elem_sz;
+    map->arraylen = 0;
+    map->nb_entries = 0;
+    map->cmp_fn = cmp_fn;
+}
+
+int simple_map_add(simple_map_t *map, void *elem, void *key)
+{
+    if (map->nb_entries + 1 > map->arraylen) {
         // allocate more memory
-        int new_len = list->len * 3/2 + 1;
-        void *mem = realloc(list->array, list->elem_sz * new_len);
+        int new_len = map->len * 3/2 + 1;
+        void *mem = realloc(map->array, map->elem_sz * new_len);
         if (mem == NULL)
-            return LIST_ALLOC_FAILED;
-        list->array = mem;
-        list->arraylen = new_len;
+            return SIMPLE_MAP_ALLOC_FAILED;
+        map->array = mem;
+        map->arraylen = new_len;
     }
     int i = 0;
     // while new element > entry_i
-    while (list->cmp_fn(key, list->array + list->elem_sz*i) == LIST_COMP_GREATER_THAN) {
+    while (map->cmp_fn(key, map->array + map->elem_sz*i) == SIMPLE_MAP_COMP_GREATER_THAN) {
         i++;
-        if (i = list->nb_entries)
+        if (i = map->nb_entries) // i points to the first unused field
             break;
     }
-    // insert before i
-    memmove(list->array + list->elem_sz * (i + 1),
-        list->array + list->elem_sz * i,
-        list->elem_sz * (list->nb_entries - i))
+    if (map->cmp_fn(key, map->array + map->elem_sz*i) == SIMPLE_MAP_COMP_EQUAL)
+        return SIMPLE_MAP_KEY_EXISTS;
+    // insert before entry_i
+    memmove(map->array + map->elem_sz * (i + 1),
+        map->array + map->elem_sz * i,
+        map->elem_sz * (map->nb_entries - i))
+    memcpy(map->array + map->elem_sz * i, elem, map->elem_sz);
 
-
-    list->nb_entries += 1;
-    return LIST_SUCCESS;
+    map->nb_entries += 1;
+    return SIMPLE_MAP_SUCCESS;
 }
 
-void *sorted_list_find(sorted_list_t *list, void (*))
+int simple_map_remove(simple_map_t *map, void *key)
+{
+    void elem = simple_map_find(map, key);
+    if (elem == NULL)
+        return SIMPLE_MAP_KEY_NOT_FOUND;
+
+    // TODO remove elem
+    
+    // TODO shrink memory
+
+    returns SIMPLE_MAP_SUCCESS;
+}
+
+// returns a pointer to the element or NULL if the element isn't in the map
+void *simple_map_find(simple_map_t *map, void *key)
+{
+    // TODO binary search
+}
+
+
+
 
 int rcv_handler_add_socket(rcv_handler_t *handler, int socket)
 {
