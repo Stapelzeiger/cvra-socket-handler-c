@@ -66,6 +66,40 @@ int main(void)
     key = 24567; // nonexistant key
     assert(simple_map_find(&map, &key) == NULL);
 
+    // test remove
+    key = 42;
+    simple_map_remove(&map, &key);
+    assert(simple_map_find(&map, &key) == NULL);
+    key = 23;
+    res = simple_map_find(&map, &key);
+    assert(res->x == 3445);
+    key = 50;
+    res = simple_map_find(&map, &key);
+    assert(res->x == 1337);
+
+    key = 24567; // nonexistant key
+    assert(simple_map_find(&map, &key) == NULL);
+
+    // test remove with memory shrinking
+    key = 23;
+    simple_map_remove(&map, &key);
+    assert(simple_map_find(&map, &key) == NULL);
+    key = 50;
+    res = simple_map_find(&map, &key);
+    assert(res->x == 1337);
+    simple_map_remove(&map, &key);
+    assert(simple_map_find(&map, &key) == NULL);
+
+    key = 24567; // nonexistant key
+    assert(simple_map_find(&map, &key) == NULL);
+    //and add again
+    a.key = 23;
+    a.x = 3445;
+    simple_map_add(&map, &a, &a.key);
+    key = 23;
+    res = simple_map_find(&map, &key);
+    assert(res->x == 3445);
+
     printf("All tests passed\n");
     return 0;
 }
