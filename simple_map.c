@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #include "simple_map.h"
 
@@ -52,11 +53,24 @@ int simple_map_remove(simple_map_t *map, void *key)
     if (elem == NULL)
         return SIMPLE_MAP_KEY_NOT_FOUND;
 
-    return SIMPLE_MAP_UNKNOWN_ERROR;
-    // TODO remove elem
+    // just move what comes after over the element to delete
+    int nb_bytes = (map->nb_entries - 1) * map->elem_sz
+        - (intptr_t)elem + (intptr_t)map->array;
+    memmove(elem, elem + map->elem_sz, nb_bytes);
+    map->nb_entries--;
 
-    // TODO shrink memory
-
+    // shrink to 1.5 * entries if only half if filled
+    // This method is getting pretty slow towards the end if you're trying to
+    // empty the whole array. But if you have small fluctuations around a
+    // number of entries, it prevents too much reallocating.
+    if (map->nb_entries < map->arraylen / 2) {
+        int new_len = map->nb_entries * 3/2 + 1;
+        void *mem = realloc(map->array, map->elem_sz * new_len);
+        if (mem == NULL)
+            return SIMPLE_MAP_ALLOC_FAILED;
+        map->array = mem;
+        map->arraylen = new_len;
+    }
     return SIMPLE_MAP_SUCCESS;
 }
 
