@@ -141,10 +141,36 @@ int rcv_handler_forget_type(rcv_handler_t *handler, serialization_type_t *type)
 
 int rcv_handler_handle(rcv_handler_t *handler)
 {
-    int ret;
-    ret = poll(handler->polls.array, handler->polls.nb_entries, TIMEOUT_MSECS);
+    int ret, i;
+    struct pollfd *fds = (struct pollfd*)handler->polls.array;
+    ret = poll(fds, handler->polls.nb_entries, TIMEOUT_MSECS);
 
     // handle
+    if (ret > 0) {
+        for (i = 0; i < handler->polls.nb_entries; i++) {
+            if (fds[i].revents & POLLIN) {
+                // receive ready
+            }
+            if (fds[i].revents & POLLPRI) {
+                // high-priority receive ready
+            }
+            if (fds[i].revents & POLLHUP) {
+                // hang up
+            }
+            if (fds[i].revents & POLLERR) {
+                // error
+            }
+            if (fds[i].revents & POLLNVAL) {
+                // invalid file descriptor
+            }
+        }
+    }
+    else if (ret == 0) {
+        // timeout
+    }
+    else if (ret < 0) {
+        // TODO errno
+    }
 
     return HANDLER_UNKNOWN_ERROR;
 }
