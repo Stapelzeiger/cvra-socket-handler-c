@@ -8,8 +8,6 @@
 #include "connection.h"
 
 
-
-
 typedef struct rcv_connection_s {
     int socket;
     uint8_t header[HEADER_LENGTH];
@@ -20,7 +18,18 @@ typedef struct rcv_connection_s {
     int buffer_len;
 } rcv_connection_t;
 
+struct send_buffer_s {
+    int socket;
+    uint8_t *buffer;
+    int buffer_len;
+    int buffer_pos;
+    send_buffer_t *next;    // for singly-linked list
+};
 
+typedef struct send_descriptor_count_s {
+    int socket;
+    int count;
+} send_descriptor_count_t;
 
 
 // local function descriptors
@@ -36,6 +45,11 @@ static rcv_connection_t *rcv_connection_for_socket(rcv_handler_t *h, int socket)
 static type_callback_t *type_callback_for_hash(rcv_handler_t *h, uint8_t *hash)
 {
     return simple_map_find(&h->types, (void*)hash);
+}
+
+static int descriptor_count_for_socket(send_handler_t *h, int socket)
+{
+    return *((int*)simple_map_find(&h->descriptor_count, (void*)&socket));
 }
 
 static int _map_connection_cmp_fn(void *key, void *conn)
@@ -65,6 +79,15 @@ static int _map_type_cb_cmp_fn(void *key, void *type)
         return SIMPLE_MAP_COMP_GREATER_THAN;
     else
         return SIMPLE_MAP_COMP_SMALLER_THAN;
+}
+
+static int _map_desc_count_cmp_fn(void *key, void *desc_count)
+{
+    if (*(int *)key == ((send_descriptor_count_t*)desc_count)->socket)
+        return SIMPLE_MAP_COMP_EQUAL;
+    if (*(int *)key > ((send_descriptor_count_t*)desc_count)->socket)
+        return SIMPLE_MAP_COMP_GREATER_THAN;
+    return SIMPLE_MAP_COMP_SMALLER_THAN;
 }
 
 void rcv_handler_init(rcv_handler_t *handler)
@@ -249,7 +272,7 @@ int _receive_package(rcv_handler_t *h, int socket)
                         // receive and discard
                     }
                 }
-                conn->buffer = (uint8_t*)malloc(conn->length);
+                conn->buffer = (uint8_t*)malloc(conn->length*sizeof(uint8_t));
                 if (conn->buffer == NULL)
                     // TODO malloc fail or length == 0 (should be handled)
                     ;
@@ -307,4 +330,93 @@ int32_t _get_header_length(uint8_t header[HEADER_LENGTH])
     printf("get length: %d\n", var);
 #endif
     return var;
+}
+
+
+
+// Send handler functions
+void send_handler_init(send_handler_t *handler)
+{
+    handler->buffers = NULL;
+    simple_map_init(&handler->polls, sizeof(struct pollfd), _map_pollfd_cmp_fn);
+    simple_map_init(&handler->descriptor_count, sizeof(send_descriptor_count_t),
+            _map_desc_count_cmp_fn);
+}
+
+int send_handler_send_package(  send_handler_t *h,
+                                int socket,
+                                void *message,
+                                serialization_type_t *type)
+{
+    send_buffer_t *prev_buffer = h->buffers;
+    send_buffer_t *new_buffer = NULL;
+
+    if (prev_buffer != NULL) {
+        // find end of linked list
+        while (prev_buffer->next != NULL) {
+            prev_buffer = prev_buffer->next;
+        }
+        new_buffer = malloc(sizeof(send_buffer_t));
+        if (new_buffer == NULL) {
+            return HANDLER_MALLOC_FAILED;
+        }
+        new_buffer->socket = socket;
+        // TODO this will change
+        type->serialize(message, new_buffer->buffer, &new_buffer->buffer_len);
+        new_buffer->buffer_pos = 0;
+        new_buffer->next = NULL;
+        prev_buffer->next = new_buffer;
+
+        // count messages per socket
+        send_descriptor_count_t *count;
+        count = simple_map_find(&h->descriptor_count, (void*)&socket);
+        if (count == NULL) {
+            // count is zero
+            send_descriptor_count_t new_count = { socket, 1 };
+            if (simple_map_add(&h->descriptor_count, &new_count,
+                        &new_count.socket) != SIMPLE_MAP_SUCCESS) {
+                return HANDLER_UNKNOWN_ERROR;
+            }
+
+            // register socket for polling
+            struct pollfd fd;
+            fd.fd = socket;
+            fd.events = POLLOUT;
+
+            if (simple_map_add(&h->polls, &fd, &fd.fd) == SIMPLE_MAP_ALLOC_FAILED)
+                return HANDLER_MALLOC_FAILED;
+        }
+        else {
+            count->count++;
+        }
+    }
+    else {
+        // first entry in the list of buffers
+        // this is a bit copypasta, but it saves a few CPU cycles
+        prev_buffer = malloc(sizeof(send_buffer_t));
+        if (prev_buffer == NULL) {
+            return HANDLER_MALLOC_FAILED;
+        }
+        prev_buffer->socket = socket;
+        // TODO this will change
+        type->serialize(message, prev_buffer->buffer, &prev_buffer->buffer_len);
+        prev_buffer->buffer_pos = 0;
+        prev_buffer->next = NULL;
+
+        // count messages per socket
+        // count is zero
+        send_descriptor_count_t new_count = { socket, 1 };
+        if (simple_map_add(&h->descriptor_count, &new_count,
+                    &new_count.socket) != SIMPLE_MAP_SUCCESS) {
+            return HANDLER_UNKNOWN_ERROR;
+        }
+
+        // register socket for polling
+        struct pollfd fd;
+        fd.fd = socket;
+        fd.events = POLLOUT;
+
+        if (simple_map_add(&h->polls, &fd, &fd.fd) == SIMPLE_MAP_ALLOC_FAILED)
+            return HANDLER_MALLOC_FAILED;
+    }
 }
