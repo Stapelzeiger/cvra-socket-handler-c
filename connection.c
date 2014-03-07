@@ -176,20 +176,18 @@ int rcv_handler_handle(rcv_handler_t *handler)
 #ifdef DEBUG
                 printf("Hang up\n");
 #endif
-                if (shutdown(fds[i].fd, SHUT_RDWR) == 0) {
-                    // TODO shutdown successful
-                }
+                shutdown(fds[i].fd, SHUT_RDWR);
                 rcv_handler_remove_socket(handler, fds[i].fd);
+                return HANDLER_SUCCESS; // maybe reutrn some warning
             }
             if (fds[i].revents & POLLERR) {
                 // error
 #ifdef DEBUG
                 printf("Error\n");
 #endif
-                if (shutdown(fds[i].fd, SHUT_RDWR) == 0) {
-                    // TODO shutdown successful
-                }
+                shutdown(fds[i].fd, SHUT_RDWR);
                 rcv_handler_remove_socket(handler, fds[i].fd);
+                return HANDLER_SUCCESS; // maybe reutrn some warning
             }
             if (fds[i].revents & POLLNVAL) {
                 // invalid file descriptor
@@ -197,6 +195,7 @@ int rcv_handler_handle(rcv_handler_t *handler)
                 printf("Inval\n");
 #endif
                 rcv_handler_remove_socket(handler, fds[i].fd);
+                return HANDLER_SUCCESS; // maybe reutrn some warning
             }
         }
     }
@@ -227,10 +226,9 @@ int _receive_package(rcv_handler_t *h, int socket)
 #ifdef DEBUG
                 printf("Peer closed socket %d.\n", socket);
 #endif
-                if (shutdown(socket, SHUT_RDWR) == 0) {
-                    // TODO shutdown successful
-                }
+                shutdown(socket, SHUT_RDWR);
                 rcv_handler_remove_socket(h, socket);
+                return HANDLER_SUCCESS; // maybe reutrn some warning
             }
             else {
                 // TODO error receiving
@@ -254,28 +252,28 @@ int _receive_package(rcv_handler_t *h, int socket)
                     printf("Unknown type.\n");
                     if (conn->length > ACCEPTED_GARBAGE) {
                         // too much, close socket
-                        if (shutdown(socket, SHUT_RDWR) == 0) {
-                            // TODO shutdown successful
-                        }
-                        else {
-#ifdef DEBUG
-                            printf("Couldn't shutdown.\n");
-#endif
-                        }
-                        if (rcv_handler_remove_socket(h, socket) != HANDLER_SUCCESS)
+                        // TODO should there be some kind of warning
+                        shutdown(socket, SHUT_RDWR);
+                        if (rcv_handler_remove_socket(h, socket) != HANDLER_SUCCESS){
 #ifdef DEBUG
                             printf("Couldn't remove.\n");
 #endif
-                        return 0;   // TODO
+                        }
+                        return HANDLER_SUCCESS;
                     }
                     else {
                         // receive and discard
                     }
                 }
                 conn->buffer = (uint8_t*)malloc(conn->length*sizeof(uint8_t));
-                if (conn->buffer == NULL)
-                    // TODO malloc fail or length == 0 (should be handled)
-                    ;
+                if (conn->buffer == NULL) {
+                    if (conn->length == 0) {
+                        // TODO package of zero length? not sure if legit.
+                    }
+                    else {
+                        return HANDLER_MALLOC_FAILED;
+                    }
+                }
             }
             ret = recv(socket, conn->buffer + conn->buffer_len,
                     conn->length - conn->buffer_len, 0);
@@ -286,9 +284,7 @@ int _receive_package(rcv_handler_t *h, int socket)
 #ifdef DEBUG
                 printf("Peer closed socket %d.\n", socket);
 #endif
-                if (shutdown(socket, SHUT_RDWR) == 0) {
-                    // TODO shutdown successful
-                }
+                shutdown(socket, SHUT_RDWR);
                 rcv_handler_remove_socket(h, socket);
             }
             else {
@@ -297,10 +293,15 @@ int _receive_package(rcv_handler_t *h, int socket)
 
             if (conn->length == conn->buffer_len) {
                 // the whole message has been received
-                if (conn->type != NULL)
+                if (conn->type != NULL) {
                     conn->type->callback(
                         conn->type->type->deserialize(conn->buffer, conn->length)
                         , socket);
+                }
+                else {
+                    // unknown type; no callback
+                    // TODO unkown type callback :)
+                }
                 // clear all the buffers
                 conn->header_len = 0;
                 conn->length = 0;
