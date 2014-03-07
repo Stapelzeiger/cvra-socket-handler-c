@@ -248,11 +248,10 @@ int _receive_package(rcv_handler_t *h, int socket)
                 conn->type = type_callback_for_hash(h,
                         &conn->header[HEADER_LENGTH_FIELD]);
                 if (conn->type == NULL) {
-                    // TODO unkown type
                     printf("Unknown type.\n");
                     if (conn->length > ACCEPTED_GARBAGE) {
                         // too much, close socket
-                        // TODO should there be some kind of warning
+                        // TODO should there be some kind of warning?
                         shutdown(socket, SHUT_RDWR);
                         if (rcv_handler_remove_socket(h, socket) != HANDLER_SUCCESS){
 #ifdef DEBUG
