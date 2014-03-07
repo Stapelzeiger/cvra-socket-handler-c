@@ -60,6 +60,7 @@ int rcv_handler_register_type(rcv_handler_t *handler,
 int rcv_handler_forget_type(rcv_handler_t *handler, serialization_type_t *type);
 
 void send_handler_init(send_handler_t *handler);
+int send_handler_handle(send_handler_t *h);
 int send_handler_send_package(  send_handler_t *h,
                                 int socket,
                                 void *message,

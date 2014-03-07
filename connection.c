@@ -36,6 +36,11 @@ typedef struct send_descriptor_count_s {
 int _receive_package(rcv_handler_t *h, int socket);
 int32_t _get_header_length(uint8_t header[HEADER_LENGTH]);
 
+short int *_send_revents_for_socket(send_handler_t *h, int socket);
+void _remove_send_buffer(    send_handler_t *h,
+                            send_buffer_t *buffer,
+                            send_buffer_t *prev_buffer);
+
 
 static rcv_connection_t *rcv_connection_for_socket(rcv_handler_t *h, int socket)
 {
@@ -343,6 +348,80 @@ void send_handler_init(send_handler_t *handler)
             _map_desc_count_cmp_fn);
 }
 
+int send_handler_handle(send_handler_t *h)
+{
+    int ret, i;
+    struct pollfd *fds = (struct pollfd*)h->polls.array;
+    ret = poll(fds, h->polls.nb_entries, POLL_TIMEOUT_MSECS);
+
+    if (ret > 0) {
+        // there's at lest 1 socket where we can send
+        send_buffer_t *buffer = h->buffers;
+        send_buffer_t *prev_buffer = NULL;
+        short int *revents = NULL;
+        while (buffer != NULL) {
+            // go through the linked list of buffers
+            revents = _send_revents_for_socket(h, buffer->socket);
+            if (revents == NULL) return HANDLER_UNKNOWN_ERROR;
+
+            if (*revents & POLLOUT) {
+                // ready to send
+                int sent_bytes;
+                // TODO sizeof(uint8_t) * buffer_pos for pointer magic?
+                sent_bytes = send(buffer->socket, buffer->buffer + buffer->buffer_pos,
+                        buffer->buffer_len - buffer->buffer_pos, 0);
+                if (sent_bytes > 0) {
+                    buffer->buffer_pos += sent_bytes;
+                }
+                else if (sent_bytes == 0) {
+                    // TODO check when and if this can actually happen
+                    // The equivalent on the recv side would mean that the
+                    // peer has closed the connection.
+                }
+                else {
+                    // TODO errno
+                }
+
+                // remove event, so nothing else will be sent to the socket
+                *revents &= ~POLLOUT;
+
+                if (buffer->buffer_pos == buffer->buffer_len) {
+                    // all sent; remove buffer
+                    _remove_send_buffer(h, buffer, prev_buffer);
+                }
+            }
+            if (*revents & POLLHUP) {
+                // hang up
+                shutdown(buffer->socket, SHUT_RDWR);
+                _remove_send_buffer(h, buffer, prev_buffer);
+
+            }
+            if (*revents & POLLERR) {
+                // error
+                shutdown(buffer->socket, SHUT_RDWR);
+                _remove_send_buffer(h, buffer, prev_buffer);
+            }
+            if (*revents & POLLNVAL) {
+                // invalid file descriptor
+                shutdown(buffer->socket, SHUT_RDWR);
+                _remove_send_buffer(h, buffer, prev_buffer);
+            }
+            prev_buffer = buffer;
+            buffer = buffer->next;
+        }
+    }
+    else if (ret == 0){
+        // poll timeout
+        return HANDLER_SUCCESS;
+    }
+    else {
+        // TODO errno
+        return HANDLER_UNKNOWN_ERROR;
+    }
+
+    return HANDLER_SUCCESS;
+}
+
 int send_handler_send_package(  send_handler_t *h,
                                 int socket,
                                 void *message,
@@ -393,15 +472,15 @@ int send_handler_send_package(  send_handler_t *h,
     else {
         // first entry in the list of buffers
         // this is a bit copypasta, but it saves a few CPU cycles
-        prev_buffer = malloc(sizeof(send_buffer_t));
-        if (prev_buffer == NULL) {
+        h->buffers = malloc(sizeof(send_buffer_t));
+        if (h->buffers == NULL) {
             return HANDLER_MALLOC_FAILED;
         }
-        prev_buffer->socket = socket;
+        h->buffers->socket = socket;
         // TODO this will change
-        type->serialize(message, prev_buffer->buffer, &prev_buffer->buffer_len);
-        prev_buffer->buffer_pos = 0;
-        prev_buffer->next = NULL;
+        type->serialize(message, h->buffers->buffer, &h->buffers->buffer_len);
+        h->buffers->buffer_pos = 0;
+        h->buffers->next = NULL;
 
         // count messages per socket
         // count is zero
@@ -419,4 +498,36 @@ int send_handler_send_package(  send_handler_t *h,
         if (simple_map_add(&h->polls, &fd, &fd.fd) == SIMPLE_MAP_ALLOC_FAILED)
             return HANDLER_MALLOC_FAILED;
     }
+    return HANDLER_SUCCESS;
+}
+
+short int *_send_revents_for_socket(send_handler_t *h, int socket)
+{
+    return &((struct pollfd *)simple_map_find(&h->polls, &socket))->revents;
+}
+
+void _remove_send_buffer(    send_handler_t *h,
+                            send_buffer_t *buffer,
+                            send_buffer_t *prev_buffer)
+{
+    send_descriptor_count_t *count = NULL;
+    count = simple_map_find(&h->descriptor_count, (void*)&buffer->socket);
+    if (count != NULL) {
+        count->count--;
+        if (count->count == 0) {
+            // unregister poll as there's nothing to send to this socket anymore
+            simple_map_remove(&h->polls, (void*)&buffer->socket);
+        }
+    }
+
+    // remove buffer form linked list
+    if(prev_buffer == NULL) {
+        // first element in list
+        h->buffers = buffer->next;
+    }
+    else {
+        prev_buffer->next = buffer->next;
+    }
+    free(buffer->buffer);
+    free(buffer);
 }
