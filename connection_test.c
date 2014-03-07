@@ -10,14 +10,14 @@ typedef struct data_s {
 } data_t;
 
 data_t *deserialize(uint8_t *buffer, int length);
-void callback(void *message, int socket);
+void callback(const void *message, int socket);
 
 int main(void)
 {
     rcv_handler_t handler;
     serialization_type_t serial = {.hash = "asdfasdf",
                                     .serialize = NULL,
-                                    .deserialize = deserialize};
+                                    .deserialize = (const void*)deserialize};
     type_callback_t type;
 
     rcv_handler_init(&handler);
@@ -93,7 +93,7 @@ data_t *deserialize(uint8_t *buffer, int length)
     return data;
 }
 
-void callback(void *message, int socket)
+void callback(const void *message, int socket)
 {
     data_t *data = (data_t*)message;
     printf("Callback from socket %d: %d\n", socket, data->a);

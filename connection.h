@@ -17,8 +17,8 @@
 // TODO from serialization file
 typedef struct serialization_type_s {
     const uint8_t hash[8];
-    void const (*serialize)(void *message, uint8_t *buffer, int *length);
-    void const *(*deserialize)(uint8_t *buffer, int length);
+    const void (*serialize)(void *message, uint8_t *buffer, int *length);
+    const void *(*deserialize)(uint8_t *buffer, int length);
 } serialization_type_t;
 
 typedef struct receive_handler_s {
@@ -47,7 +47,7 @@ typedef struct send_handler_s {
 
 typedef struct type_callback_s {
     serialization_type_t *type;
-    void (*callback)(void *message, int socket);
+    void (*callback)(const void *message, int socket);
 }type_callback_t;
 
 
@@ -56,7 +56,7 @@ int rcv_handler_handle(rcv_handler_t *handler);
 int rcv_handler_add_socket(rcv_handler_t *handler, int socket);
 int rcv_handler_remove_socket(rcv_handler_t *handler, int socket);
 int rcv_handler_register_type(rcv_handler_t *handler,
-    serialization_type_t *type, void (*callback)(void *type, int socket));
+    serialization_type_t *type, void (*callback)(const void *message, int socket));
 int rcv_handler_forget_type(rcv_handler_t *handler, serialization_type_t *type);
 
 void send_handler_init(send_handler_t *handler);

@@ -130,7 +130,7 @@ int rcv_handler_remove_socket(rcv_handler_t *handler, int socket)
 }
 
 int rcv_handler_register_type(rcv_handler_t *handler,
-    serialization_type_t *type, void (*callback)(void *type, int socket))
+    serialization_type_t *type, void (*callback)(const void *message, int socket))
 {
     type_callback_t tc;
     tc.type = type;
