@@ -15,7 +15,7 @@ void callback(const void *message, int socket);
 int main(void)
 {
     rcv_handler_t handler;
-    serialization_type_t serial = {.hash = "asdfasdf",
+    serialization_fn_table_t serial = {.hash = "asdfasdf",
                                     .serialize = NULL,
                                     .deserialize = (const void*)deserialize};
     type_callback_t type;

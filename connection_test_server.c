@@ -16,7 +16,7 @@ const void serialize(void *message, uint8_t **buffer, int *length);
 int main(void)
 {
     send_handler_t handler;
-    serialization_type_t serial = {.hash = "asdfasdf",
+    serialization_fn_table_t serial = {.hash = "asdfasdf",
                                     .serialize = serialize,
                                     .deserialize = NULL};
 

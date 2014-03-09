@@ -15,11 +15,11 @@
 
 
 // TODO from serialization file
-typedef struct serialization_type_s {
+typedef struct serialization_fn_table_s {
     const uint8_t hash[8];
     const void (*serialize)(void *message, uint8_t **buffer, int *length);
     const void *(*deserialize)(uint8_t *buffer, int length);
-} serialization_type_t;
+} serialization_fn_table_t;
 
 typedef struct receive_handler_s {
     // map socket -> rcv_connection_t
@@ -46,7 +46,7 @@ typedef struct send_handler_s {
 }send_handler_t;
 
 typedef struct type_callback_s {
-    serialization_type_t *type;
+    serialization_fn_table_t *type;
     void (*callback)(const void *message, int socket);
 }type_callback_t;
 
@@ -56,12 +56,12 @@ int rcv_handler_handle(rcv_handler_t *handler);
 int rcv_handler_add_socket(rcv_handler_t *handler, int socket);
 int rcv_handler_remove_socket(rcv_handler_t *handler, int socket);
 int rcv_handler_register_type(rcv_handler_t *handler,
-    serialization_type_t *type, void (*callback)(const void *message, int socket));
-int rcv_handler_forget_type(rcv_handler_t *handler, serialization_type_t *type);
+    serialization_fn_table_t *type, void (*callback)(const void *message, int socket));
+int rcv_handler_forget_type(rcv_handler_t *handler, serialization_fn_table_t *type);
 
 void send_handler_init(send_handler_t *handler);
 int send_handler_handle(send_handler_t *h);
 int send_handler_send_package(  send_handler_t *h,
                                 int socket,
                                 void *message,
-                                serialization_type_t *type);
+                                serialization_fn_table_t *type);

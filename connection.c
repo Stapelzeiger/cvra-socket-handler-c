@@ -135,7 +135,7 @@ int rcv_handler_remove_socket(rcv_handler_t *handler, int socket)
 }
 
 int rcv_handler_register_type(rcv_handler_t *handler,
-    serialization_type_t *type, void (*callback)(const void *message, int socket))
+    serialization_fn_table_t *type, void (*callback)(const void *message, int socket))
 {
     type_callback_t tc;
     tc.type = type;
@@ -145,7 +145,7 @@ int rcv_handler_register_type(rcv_handler_t *handler,
     return HANDLER_UNKNOWN_ERROR;
 }
 
-int rcv_handler_forget_type(rcv_handler_t *handler, serialization_type_t *type)
+int rcv_handler_forget_type(rcv_handler_t *handler, serialization_fn_table_t *type)
 {
     if (simple_map_remove(&handler->connections, (void*)&type->hash) != SIMPLE_MAP_SUCCESS)
         return HANDLER_UNKNOWN_ERROR;
@@ -298,9 +298,16 @@ int _receive_package(rcv_handler_t *h, int socket)
             if (conn->length == conn->buffer_len) {
                 // the whole message has been received
                 if (conn->type != NULL) {
-                    conn->type->callback(
-                        conn->type->type->deserialize(conn->buffer, conn->length)
-                        , socket);
+                    size_t alloc_size = conn->type->type->alloc_size(
+                            conn->buffer,
+                            conn->length);
+                    void *data;)
+                    if (alloc_size == -1) {
+                        data = malloc(alloc_size);
+                        if (data == NULL) return HANDLER_MALLOC_FAILED;
+                        data = conn->type->type->deserialize(conn->buffer, data);
+                        conn->type->callback(data, socket);
+                    }
                 }
                 else {
                     // unknown type; no callback
@@ -426,7 +433,7 @@ int send_handler_handle(send_handler_t *h)
 int send_handler_send_package(  send_handler_t *h,
                                 int socket,
                                 void *message,
-                                serialization_type_t *type)
+                                serialization_fn_table_t *type)
 {
     send_buffer_t *prev_buffer = h->buffers;
     send_buffer_t *new_buffer = NULL;
@@ -441,8 +448,12 @@ int send_handler_send_package(  send_handler_t *h,
             return HANDLER_MALLOC_FAILED;
         }
         new_buffer->socket = socket;
-        // TODO this will change
-        type->serialize(message, &new_buffer->buffer, &new_buffer->buffer_len);
+        new_buffer->buffer_len = type->serialized_size(message);
+        new_buffer->buffer = malloc(new_buffer->buffer_len);
+        if (new_buffer->buffer == NULL) {
+            return HANDLER_MALLOC_FAILED;
+        }
+        type->serialize(message, new_buffer->buffer);
         new_buffer->buffer_pos = 0;
         new_buffer->next = NULL;
         prev_buffer->next = new_buffer;
@@ -478,8 +489,12 @@ int send_handler_send_package(  send_handler_t *h,
             return HANDLER_MALLOC_FAILED;
         }
         h->buffers->socket = socket;
-        // TODO this will change
-        type->serialize(message, &h->buffers->buffer, &h->buffers->buffer_len);
+        new_buffer->buffer_len = type->serialized_size(message);
+        new_buffer->buffer = malloc(new_buffer->buffer_len);
+        if (new_buffer->buffer == NULL) {
+            return HANDLER_MALLOC_FAILED;
+        }
+        type->serialize(message, new_buffer->buffer);
         printf("Buffer: %s\n", (char*)h->buffers->buffer);
         h->buffers->buffer_pos = 0;
         h->buffers->next = NULL;
