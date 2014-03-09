@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include "data.h"
 #include "simple_map.h"
 
 #define HANDLER_SUCCESS       0
@@ -15,11 +16,11 @@
 
 
 // TODO from serialization file
-typedef struct serialization_fn_table_s {
-    const uint8_t hash[8];
-    const void (*serialize)(void *message, uint8_t **buffer, int *length);
-    const void *(*deserialize)(uint8_t *buffer, int length);
-} serialization_fn_table_t;
+//typedef struct serialization_fn_table_s {
+//    const uint8_t hash[8];
+//    const void (*serialize)(void *message, uint8_t **buffer, int *length);
+//    const void *(*deserialize)(uint8_t *buffer, int length);
+//} serialization_fn_table_t;
 
 typedef struct receive_handler_s {
     // map socket -> rcv_connection_t

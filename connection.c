@@ -301,7 +301,7 @@ int _receive_package(rcv_handler_t *h, int socket)
                     size_t alloc_size = conn->type->type->alloc_size(
                             conn->buffer,
                             conn->length);
-                    void *data;)
+                    void *data;
                     if (alloc_size == -1) {
                         data = malloc(alloc_size);
                         if (data == NULL) return HANDLER_MALLOC_FAILED;
@@ -489,12 +489,12 @@ int send_handler_send_package(  send_handler_t *h,
             return HANDLER_MALLOC_FAILED;
         }
         h->buffers->socket = socket;
-        new_buffer->buffer_len = type->serialized_size(message);
-        new_buffer->buffer = malloc(new_buffer->buffer_len);
-        if (new_buffer->buffer == NULL) {
+        h->buffers->buffer_len = type->serialized_size(message);
+        h->buffers->buffer = malloc(h->buffers->buffer_len);
+        if (h->buffers->buffer == NULL) {
             return HANDLER_MALLOC_FAILED;
         }
-        type->serialize(message, new_buffer->buffer);
+        type->serialize(message, h->buffers->buffer);
         printf("Buffer: %s\n", (char*)h->buffers->buffer);
         h->buffers->buffer_pos = 0;
         h->buffers->next = NULL;
