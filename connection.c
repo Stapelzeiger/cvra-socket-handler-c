@@ -170,7 +170,7 @@ int rcv_handler_handle(rcv_handler_t *handler)
                 _receive_package(handler, fds[i].fd);
                 return HANDLER_SUCCESS;
             }
-            if (fds[i].revents & POLLPRI) {
+            else if (fds[i].revents & POLLPRI) {
 #ifdef DEBUG
                 printf("High priority\n");
 #endif
@@ -366,6 +366,7 @@ int send_handler_handle(send_handler_t *h)
 
             if (*revents & POLLOUT) {
                 // ready to send
+                printf("Ready to send.\n");
                 int sent_bytes;
                 // TODO sizeof(uint8_t) * buffer_pos for pointer magic?
                 sent_bytes = send(buffer->socket, buffer->buffer + buffer->buffer_pos,
@@ -441,7 +442,7 @@ int send_handler_send_package(  send_handler_t *h,
         }
         new_buffer->socket = socket;
         // TODO this will change
-        type->serialize(message, new_buffer->buffer, &new_buffer->buffer_len);
+        type->serialize(message, &new_buffer->buffer, &new_buffer->buffer_len);
         new_buffer->buffer_pos = 0;
         new_buffer->next = NULL;
         prev_buffer->next = new_buffer;
@@ -478,7 +479,8 @@ int send_handler_send_package(  send_handler_t *h,
         }
         h->buffers->socket = socket;
         // TODO this will change
-        type->serialize(message, h->buffers->buffer, &h->buffers->buffer_len);
+        type->serialize(message, &h->buffers->buffer, &h->buffers->buffer_len);
+        printf("Buffer: %s\n", (char*)h->buffers->buffer);
         h->buffers->buffer_pos = 0;
         h->buffers->next = NULL;
 
@@ -506,7 +508,7 @@ short int *_send_revents_for_socket(send_handler_t *h, int socket)
     return &((struct pollfd *)simple_map_find(&h->polls, &socket))->revents;
 }
 
-void _remove_send_buffer(    send_handler_t *h,
+void _remove_send_buffer(   send_handler_t *h,
                             send_buffer_t *buffer,
                             send_buffer_t *prev_buffer)
 {

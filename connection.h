@@ -17,7 +17,7 @@
 // TODO from serialization file
 typedef struct serialization_type_s {
     const uint8_t hash[8];
-    const void (*serialize)(void *message, uint8_t *buffer, int *length);
+    const void (*serialize)(void *message, uint8_t **buffer, int *length);
     const void *(*deserialize)(uint8_t *buffer, int length);
 } serialization_type_t;
 
